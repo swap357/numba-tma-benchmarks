@@ -1,0 +1,14 @@
+name: numba-tma
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numba>=0.58
+  - numpy
+  - pandas
+  - pip
+  - pip:
+    - plotly  # optional, for visualization
+
+
