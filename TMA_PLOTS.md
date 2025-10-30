@@ -2,6 +2,20 @@
 
 Top-down Microarchitecture Analysis (TMA) hierarchy for all benchmark functions, showing absolute CPU cycles at 4.0 GHz.
 
+#### Legend
+
+**L1 Categories (Top-level):**
+- 🟢 **Retiring** (`#2ecc71`) - Useful work, instructions successfully retired
+- 🔴 **Bad Speculation** (`#e74c3c`) - Wasted work from branch mispredicts and pipeline clears
+- 🔵 **Frontend Bound** (`#3498db`) - CPU starved waiting for instructions to fetch/decode
+- 🟠 **Backend Bound** (`#f39c12`) - CPU stalled on execution resources or memory
+
+**L2 Categories:**
+- Light/Heavy Operations, Branch Mispredicts, Machine Clears, Fetch Latency/Bandwidth, Memory Bound, Core Bound
+
+**L3 Categories:**
+- Detailed breakdowns including FP/Int arithmetic, memory hierarchy (L1/L2/L3/DRAM), port utilization, etc.
+
 ## sum1d
 ![sum1d TMA metrics](plots/sum1d.svg)
 
