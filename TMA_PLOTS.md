@@ -37,3 +37,11 @@ Top-down Microarchitecture Analysis (TMA) hierarchy for all benchmark functions,
 ## blackscholes_cnd
 ![blackscholes_cnd TMA metrics](plots/blackscholes_cnd.svg)
 
+## matmul_naive
+![matmul_naive TMA metrics](plots/matmul_naive.svg)
+
+## matmul_blocked
+![matmul_blocked TMA metrics](plots/matmul_blocked.svg)
+
+## matmul_transpose
+![matmul_transpose TMA metrics](plots/matmul_transpose.svg)
