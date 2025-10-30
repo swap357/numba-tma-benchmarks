@@ -1,10 +1,9 @@
 name: numba-tma
 channels:
-  - conda-forge
   - defaults
 dependencies:
   - python=3.11
-  - numba>=0.58
+  - numba>=0.62
   - numpy
   - pandas
   - pip
