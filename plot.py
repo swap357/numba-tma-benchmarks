@@ -43,11 +43,22 @@ L3_COLORS = {
     'core_bound': '#7f8c8d',        # Darker gray for core bound
 }
 
+def format_time(ns):
+    """Format time in appropriate unit (ns, µs, ms, s)"""
+    if ns >= 1e9:
+        return f"{ns/1e9:.2f}s"
+    elif ns >= 1e6:
+        return f"{ns/1e6:.2f}ms"
+    elif ns >= 1e3:
+        return f"{ns/1e3:.2f}µs"
+    else:
+        return f"{ns:.0f}ns"
+
 def format_label(metric_name):
     """Convert tma_metric_name to 'Metric Name'"""
     return metric_name.replace('tma_', '').replace('_', ' ').title()
 
-def add_bar_trace(fig, engine, metric, value, row, color, opacity=1.0, min_text=3, fontsize=10):
+def add_bar_trace(fig, engine, metric, value, row, color, opacity=1.0, min_text=3, fontsize=10, show_in_legend=False):
     """Helper to add a bar trace with consistent styling"""
     y_label = "Python" if engine == 'py' else "JIT"
     label = format_label(metric)
@@ -62,7 +73,8 @@ def add_bar_trace(fig, engine, metric, value, row, color, opacity=1.0, min_text=
         textposition='inside',
         textfont=dict(size=fontsize),
         hovertemplate=f"<b>{label}</b><br>{y_label}: {value:.1f}%<extra></extra>",
-        showlegend=False,
+        showlegend=show_in_legend,
+        legendgroup=label,
     ), row=row, col=1)
 
 def plot_full_hierarchy(df, function):
@@ -92,13 +104,14 @@ def plot_full_hierarchy(df, function):
     
     engines = ['py', 'jit']
     
-    # L1 METRICS
-    for engine in engines:
+    # L1 METRICS (show in legend only for first engine)
+    for i, engine in enumerate(engines):
         row = func_data[func_data['engine'] == engine].iloc[0]
         for metric in TMA_HIERARCHY['l1']:
             if metric in row:
                 add_bar_trace(fig, engine, metric, row[metric], row=1, 
-                             color=L1_COLORS.get(metric, '#95a5a6'))
+                             color=L1_COLORS.get(metric, '#95a5a6'),
+                             show_in_legend=(i == 0))
     
     # L2 METRICS
     for engine in engines:
@@ -119,17 +132,25 @@ def plot_full_hierarchy(df, function):
                                  color=L3_COLORS.get(cat, '#95a5a6'), opacity=0.7, min_text=2, fontsize=9)
     
     # Get timing info
-    py_time = func_data[func_data['engine'] == 'py']['elapsed_ns_mean'].iloc[0] / 1000
-    jit_time = func_data[func_data['engine'] == 'jit']['elapsed_ns_mean'].iloc[0] / 1000
-    speedup = py_time / jit_time
+    py_time_ns = func_data[func_data['engine'] == 'py']['elapsed_ns_mean'].iloc[0]
+    jit_time_ns = func_data[func_data['engine'] == 'jit']['elapsed_ns_mean'].iloc[0]
+    speedup = py_time_ns / jit_time_ns
     
     fig.update_layout(
         title=f"<b>{function}</b> - Complete TMA Hierarchy<br>" + 
-              f"<sub>Python: {py_time:.2f}µs | JIT: {jit_time:.2f}µs | Speedup: {speedup:.0f}x</sub>",
+              f"<sub>Python: {format_time(py_time_ns)} | JIT: {format_time(jit_time_ns)} | Speedup: {speedup:.1f}x</sub>",
         barmode='stack',
         height=900,
         template='plotly_white',
-        showlegend=False,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            title="L1 Categories",
+        ),
     )
     
     fig.update_xaxes(title_text='Percentage (%)', range=[0, 100])

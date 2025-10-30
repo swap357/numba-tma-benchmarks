@@ -6,18 +6,23 @@ import subprocess
 import json
 import csv
 import sys
+import os
 import re
 from collections import defaultdict
 
 # Benchmark configurations
+# Problem sizes chosen to ensure ~100-1000ms runtime for accurate TMA metrics
 BENCHMARKS = [
-    ("sum1d", 1000000),
-    ("sum2d", 1000),
-    ("while_count", 1000000),
-    ("andor", 1000),
-    ("copy_arrays", 1000000),
-    ("copy_arrays2d", 1000),
-    ("blackscholes_cnd", 10000),
+    ("sum1d", 30000000),
+    ("sum2d", 2000),
+    ("while_count", 30000000),
+    ("andor", 5000000),
+    ("copy_arrays", 5000000),
+    ("copy_arrays2d", 2000),
+    ("blackscholes_cnd", 5000000),
+    ("matmul_naive", 200),
+    ("matmul_blocked", 200),
+    ("matmul_transpose", 200),
 ]
 
 ENGINES = ["py", "jit"]
@@ -53,7 +58,9 @@ def run_perf_stat(function, engine, n, reps=3, cpu_pin="0"):
     print(f"Benchmarking {function:15s} [{engine:3s}] n={n:>8d}", 
           file=sys.stderr, end=' ... ', flush=True)
     
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd="/root/numba-experiments")
+    # Use script's directory as working directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=script_dir)
     
     # Parse stdout for benchmark result (JSON)
     benchmark_result = None

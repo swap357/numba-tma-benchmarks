@@ -67,11 +67,22 @@ def format_cycles(cycles):
     else:
         return f"{cycles:.0f}"
 
+def format_time(ns):
+    """Format time in appropriate unit (ns, µs, ms, s)"""
+    if ns >= 1e9:
+        return f"{ns/1e9:.2f}s"
+    elif ns >= 1e6:
+        return f"{ns/1e6:.2f}ms"
+    elif ns >= 1e3:
+        return f"{ns/1e3:.2f}µs"
+    else:
+        return f"{ns:.0f}ns"
+
 def format_label(metric_name):
     """Convert tma_metric_name to 'Metric Name'"""
     return metric_name.replace('tma_', '').replace('_', ' ').title()
 
-def add_bar_trace(fig, engine, metric, pct, total_cycles, row, color, opacity=1.0, min_cycles=500, fontsize=10):
+def add_bar_trace(fig, engine, metric, pct, total_cycles, row, color, opacity=1.0, min_cycles=500, fontsize=10, show_in_legend=False):
     """Helper to add a bar trace with cycle counts"""
     y_label = "Python" if engine == 'py' else "JIT"
     label = format_label(metric)
@@ -89,7 +100,8 @@ def add_bar_trace(fig, engine, metric, pct, total_cycles, row, color, opacity=1.
         textposition='inside',
         textfont=dict(size=fontsize, color='white'),
         hovertemplate=f"<b>{label}</b><br>{y_label}<br>Cycles: {cycles:,.0f}<br>{pct:.1f}%<extra></extra>",
-        showlegend=False,
+        showlegend=show_in_legend,
+        legendgroup=label,
     ), row=row, col=1)
 
 def plot_full_hierarchy(df, function):
@@ -107,12 +119,13 @@ def plot_full_hierarchy(df, function):
         row = func_data[func_data['engine'] == engine].iloc[0]
         time_ns = row['elapsed_ns_mean']
         data[engine] = {
-            'time_us': time_ns / 1000,
+            'time_ns': time_ns,
+            'time_str': format_time(time_ns),
             'total_cycles': ns_to_cycles(time_ns),
             'row': row
         }
 
-    speedup = data['py']['total_cycles'] / data['jit']['total_cycles']
+    speedup = data['py']['time_ns'] / data['jit']['time_ns']
     use_log = speedup > 100
 
     # Create subplots
@@ -130,14 +143,15 @@ def plot_full_hierarchy(df, function):
 
     engines = ['py', 'jit']
 
-    # L1 METRICS
-    for engine in engines:
+    # L1 METRICS (show in legend only for first engine)
+    for i, engine in enumerate(engines):
         row = data[engine]['row']
         total = data[engine]['total_cycles']
         for metric in TMA_HIERARCHY['l1']:
             if metric in row:
                 add_bar_trace(fig, engine, metric, row[metric], total, row=1,
-                             color=L1_COLORS.get(metric, '#95a5a6'), min_cycles=1000)
+                             color=L1_COLORS.get(metric, '#95a5a6'), min_cycles=1000, 
+                             show_in_legend=(i == 0))
 
     # L2 METRICS
     for engine in engines:
@@ -165,14 +179,22 @@ def plot_full_hierarchy(df, function):
 
     fig.update_layout(
         title=f"<b>{function}</b> - Complete TMA Hierarchy (Absolute Cycles @ {CPU_FREQ_GHZ:.1f} GHz)<br>" +
-              f"<sub>Python: {data['py']['time_us']:.2f}µs ({format_cycles(data['py']['total_cycles'])} cycles) | " +
-              f"JIT: {data['jit']['time_us']:.2f}µs ({format_cycles(data['jit']['total_cycles'])} cycles) | " +
+              f"<sub>Python: {data['py']['time_str']} ({format_cycles(data['py']['total_cycles'])} cycles) | " +
+              f"JIT: {data['jit']['time_str']} ({format_cycles(data['jit']['total_cycles'])} cycles) | " +
               f"Speedup: {speedup:.1f}x</sub>",
         barmode='stack',
         height=900,
         width=1400,
         template='plotly_white',
-        showlegend=False,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            title="L1 Categories",
+        ),
     )
 
     if use_log:

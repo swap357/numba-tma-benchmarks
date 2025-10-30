@@ -31,9 +31,13 @@ def while_count(s, e):
         i += 1
     return c
 
-def andor(x, y):
-    """Boolean logic test"""
-    return (x > 0 and x < 10) or (y > 0 and y < 10)
+def andor(x_arr, y_arr):
+    """Boolean logic test on arrays"""
+    result = 0
+    for i in range(x_arr.shape[0]):
+        if (x_arr[i] > 0 and x_arr[i] < 10) or (y_arr[i] > 0 and y_arr[i] < 10):
+            result += 1
+    return result
 
 def copy_arrays(a, b):
     """Copy 1D array elements"""
@@ -46,20 +50,68 @@ def copy_arrays2d(a, b):
         for j in range(a.shape[1]):
             b[i, j] = a[i, j]
 
-def blackscholes_cnd(d):
-    """Black-Scholes cumulative normal distribution"""
+def blackscholes_cnd(d_arr):
+    """Black-Scholes cumulative normal distribution on array"""
     A1 = 0.31938153
     A2 = -0.356563782
     A3 = 1.781477937
     A4 = -1.821255978
     A5 = 1.330274429
     RSQRT2PI = 0.39894228040143267793994605993438
-    K = 1.0 / (1.0 + 0.2316419 * math.fabs(d))
-    ret_val = (RSQRT2PI * math.exp(-0.5 * d * d) *
-               (K * (A1 + K * (A2 + K * (A3 + K * (A4 + K * A5))))))
-    if d > 0:
-        ret_val = 1.0 - ret_val
-    return ret_val
+    result = 0.0
+    for i in range(d_arr.shape[0]):
+        d = d_arr[i]
+        K = 1.0 / (1.0 + 0.2316419 * math.fabs(d))
+        ret_val = (RSQRT2PI * math.exp(-0.5 * d * d) *
+                   (K * (A1 + K * (A2 + K * (A3 + K * (A4 + K * A5))))))
+        if d > 0:
+            ret_val = 1.0 - ret_val
+        result += ret_val
+    return result
+
+def matmul_naive(A, B, C):
+    """Naive matrix multiplication: C = A @ B"""
+    n = A.shape[0]
+    m = B.shape[1]
+    k = A.shape[1]
+    for i in range(n):
+        for j in range(m):
+            c = 0.0
+            for l in range(k):
+                c += A[i, l] * B[l, j]
+            C[i, j] = c
+
+def matmul_blocked(A, B, C, block_size=32):
+    """Blocked/tiled matrix multiplication: C = A @ B"""
+    n = A.shape[0]
+    m = B.shape[1]
+    k = A.shape[1]
+    for ii in range(0, n, block_size):
+        for jj in range(0, m, block_size):
+            for kk in range(0, k, block_size):
+                # Process block
+                i_end = min(ii + block_size, n)
+                j_end = min(jj + block_size, m)
+                k_end = min(kk + block_size, k)
+                for i in range(ii, i_end):
+                    for j in range(jj, j_end):
+                        c = C[i, j]  # Start with existing value (accumulates across kk blocks)
+                        for l in range(kk, k_end):
+                            c += A[i, l] * B[l, j]
+                        C[i, j] = c
+
+def matmul_transpose(A, B_T, C):
+    """Matrix multiplication with pre-transposed B: C = A @ B_T.T"""
+    # B_T is already transposed, so we access it as B_T[j, l] instead of B[l, j]
+    n = A.shape[0]
+    m = B_T.shape[0]  # B_T.shape[0] == original B.shape[1]
+    k = A.shape[1]
+    for i in range(n):
+        for j in range(m):
+            c = 0.0
+            for l in range(k):
+                c += A[i, l] * B_T[j, l]  # B_T[j, l] == original B[l, j]
+            C[i, j] = c
 
 # ============================================================================
 # JIT compiled versions
@@ -72,6 +124,9 @@ andor_jit = jit(nopython=True, cache=True)(andor)
 copy_arrays_jit = jit(nopython=True, cache=True)(copy_arrays)
 copy_arrays2d_jit = jit(nopython=True, cache=True)(copy_arrays2d)
 blackscholes_cnd_jit = jit(nopython=True, cache=True)(blackscholes_cnd)
+matmul_naive_jit = jit(nopython=True, cache=True)(matmul_naive)
+matmul_blocked_jit = jit(nopython=True, cache=True)(matmul_blocked)
+matmul_transpose_jit = jit(nopython=True, cache=True)(matmul_transpose)
 
 # ============================================================================
 # Timing utilities
@@ -125,8 +180,14 @@ BENCHMARKS = {
         'py': andor,
         'jit': andor_jit,
         'timer': timethis_scalar,
-        'args_fn': lambda n: (n % 20 - 10, n % 20 - 10),
-        'warmup_args_fn': lambda n: (5, 5),
+        'args_fn': lambda n: (
+            ((np.arange(n, dtype=np.int32) % 20) - 10),
+            (((np.arange(n, dtype=np.int32) * 7) % 20) - 10)
+        ),
+        'warmup_args_fn': lambda n: (
+            ((np.arange(min(1000, n), dtype=np.int32) % 20) - 10),
+            (((np.arange(min(1000, n), dtype=np.int32) * 7) % 20) - 10)
+        ),
     },
     'copy_arrays': {
         'py': copy_arrays,
@@ -152,8 +213,57 @@ BENCHMARKS = {
         'py': blackscholes_cnd,
         'jit': blackscholes_cnd_jit,
         'timer': timethis_scalar,
-        'args_fn': lambda n: (float(n % 100) / 100.0,),
-        'warmup_args_fn': lambda n: (0.5,),
+        'args_fn': lambda n: (
+            ((np.arange(n, dtype=np.int32) % 200) - 100).astype(np.float64) / 10.0,
+        ),
+        'warmup_args_fn': lambda n: (
+            ((np.arange(min(1000, n), dtype=np.int32) % 200) - 100).astype(np.float64) / 10.0,
+        ),
+    },
+    'matmul_naive': {
+        'py': matmul_naive,
+        'jit': matmul_naive_jit,
+        'timer': timethis_array,
+        'args_fn': lambda n: (
+            np.random.rand(n, n).astype(np.float64),
+            np.random.rand(n, n).astype(np.float64),
+            np.zeros((n, n), dtype=np.float64)
+        ),
+        'warmup_args_fn': lambda n: (
+            np.random.rand(50, 50).astype(np.float64),
+            np.random.rand(50, 50).astype(np.float64),
+            np.zeros((50, 50), dtype=np.float64)
+        ),
+    },
+    'matmul_blocked': {
+        'py': matmul_blocked,
+        'jit': matmul_blocked_jit,
+        'timer': timethis_array,
+        'args_fn': lambda n: (
+            np.random.rand(n, n).astype(np.float64),
+            np.random.rand(n, n).astype(np.float64),
+            np.zeros((n, n), dtype=np.float64)
+        ),
+        'warmup_args_fn': lambda n: (
+            np.random.rand(50, 50).astype(np.float64),
+            np.random.rand(50, 50).astype(np.float64),
+            np.zeros((50, 50), dtype=np.float64)
+        ),
+    },
+    'matmul_transpose': {
+        'py': matmul_transpose,
+        'jit': matmul_transpose_jit,
+        'timer': timethis_array,
+        'args_fn': lambda n: (
+            np.random.rand(n, n).astype(np.float64),
+            np.random.rand(n, n).astype(np.float64).T,  # Pre-transpose B
+            np.zeros((n, n), dtype=np.float64)
+        ),
+        'warmup_args_fn': lambda n: (
+            np.random.rand(50, 50).astype(np.float64),
+            np.random.rand(50, 50).astype(np.float64).T,  # Pre-transpose B
+            np.zeros((50, 50), dtype=np.float64)
+        ),
     },
 }
 
